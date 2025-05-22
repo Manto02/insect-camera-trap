@@ -5,6 +5,7 @@ import numpy as np
 import struct
 import queue
 import sys
+from ultralytics import YOLO 
 
 # creazione di una coda per gestire la visualizzazione dei frame fuori dal thread client
 frame_queue = queue.Queue(maxsize=100) #maxsize=1 mostra solo il frame piu' recente
@@ -13,7 +14,19 @@ frame_queue = queue.Queue(maxsize=100) #maxsize=1 mostra solo il frame piu' rece
 stop_threads = False
 
 
-def handle_client(client_socket, client_port):
+def loadYoloModel(yolo_model):
+    try:
+        model_path = "./yolo-models/insect_detect2.pt"
+        yolo_model = YOLO(model_path, task = 'detect')
+        print("Modello yolo caricato con successo")
+        return yolo_model
+    except Exception as e:
+        print(f"Errore nel caricamento del modello yolo: {e}")
+        print("Il server continuera' a ricevere le immagini ma non vi applichera' l' inferenza")
+        yolo_model = None
+        return yolo_model
+
+def handle_client(client_socket, client_port, model):
     """Gestisce la comunicazione con un singolo client."""
     print(f"Connessione accettata da {client_port}")
 
@@ -90,11 +103,20 @@ def handle_client(client_socket, client_port):
             frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
 
             
-            # visualizzazione frame ricevuto
+            # caricamento frame nella coda per la visualizazzione
             if frame is not None:
                 try:
-                    frame_queue.put_nowait(frame)
+                    # inferenza yolo 
+                    if model is not None:
+                        results = model.predict(frame, verbose=False)
+                        frame_with_detection = results[0].plot()
+                        frame_queue.put_nowait(frame_with_detection)
+                        print(f"Inserito nella coda un frame con detenzione del modello caricato")
+                    else:
+                        frame_queue.put_nowait(frame)
+                        print("Inserimento nella coda di un frame senza detenzioni")
                     print(f"Numero di frame all' interno della coda: {frame_queue.qsize}")
+                    
                 except queue.Full:
                     print("La coda e' piena")
                     pass # la coda e' piena e il frame viene scartato
@@ -114,6 +136,7 @@ def handle_client(client_socket, client_port):
 def start_server(host, port):
 
     global stop_threads
+    yolo_model = None
 
     """Avvia il server TCP."""
     # Crea un socket TCP/IP
@@ -126,6 +149,8 @@ def start_server(host, port):
 
     print(f"Server in ascolto su {host}:{port}")
 
+    yolo_model = loadYoloModel(yolo_model)
+
     # lista per tenere traccia dei thread creati
     client_threads = []
     
@@ -137,14 +162,14 @@ def start_server(host, port):
         while True:
             try:
                 # Aspetta una connessione
-                server_socket.settimeout(0.1) # Imposta un breve timeout su accept
+                server_socket.settimeout(1) # Imposta un breve timeout su accept
                 client_socket, client_port = server_socket.accept()
                 server_socket.settimeout(None)
 
 
                 # Avvia un nuovo thread per gestire la connessione del client
                 client_handler = threading.Thread(
-                    target=handle_client, args=(client_socket, client_port)
+                    target=handle_client, args=(client_socket, client_port, yolo_model)
                 )
                 client_handler.start()
                 client_threads.append(client_handler)
@@ -158,7 +183,6 @@ def start_server(host, port):
                 frame_to_display = frame_queue.get_nowait()
                 cv2.imshow(window_name, frame_to_display)
             except queue.Empty:
-                print("La coda e' vuota")
                 pass # la coda e' vuota, non c'e' un nuovo frame da mostrare
 
             # chiusura finestra di visualizzazione frame
