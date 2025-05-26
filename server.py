@@ -6,6 +6,7 @@ import struct
 import queue
 import sys
 from ultralytics import YOLO 
+from proximity_tracker import ProximityTracker
 
 # creazione di una coda per gestire la visualizzazione dei frame fuori dal thread client
 frame_queue = queue.Queue(maxsize=100) #maxsize=1 mostra solo il frame piu' recente
@@ -26,7 +27,7 @@ def loadYoloModel(yolo_model):
         yolo_model = None
         return yolo_model
 
-def handle_client(client_socket, client_port, model):
+def handle_client(client_socket, client_port, model, insect_tracker):
     """Gestisce la comunicazione con un singolo client."""
     print(f"Connessione accettata da {client_port}")
 
@@ -109,13 +110,35 @@ def handle_client(client_socket, client_port, model):
                     # inferenza yolo 
                     if model is not None:
                         results = model.predict(frame, verbose=False)
-                        frame_with_detection = results[0].plot()
+                        frame_with_detection = frame.copy()
+
+                        # recupero delle coordinate delle bounding boxes e attrubuzione id agli oggetti trovati
+                        objects_detected = results[0].boxes.xyxy.cpu().numpy().astype(int)
+                        
+                        # per ogni oggetto rilevato recupera la sua bounding box e le altre informazione
+                        # TODO ora che hai gli oggetti tracciati si possono salvare nel database
+                        for i, bbox in enumerate(objects_detected):
+                            xmin, ymin, xmax, ymax = bbox
+
+                        # tracking degli oggetti rivelati
+                        tracket_objects_in_frame = insect_tracker.update(objects_detected)
+
+                        # disegna le informazioni sul frame
+                        for obj in tracket_objects_in_frame:
+                            id = obj['id']
+                            bbox = obj['bbox']
+                            xmin, ymin, xmax, ymax = bbox
+                            # disegna bounding box
+                            cv2.rectangle(frame_with_detection, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
+                            # scrive ID
+                            cv2.putText(frame_with_detection, f"ID: {id}", (xmin, ymin - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2, cv2.LINE_AA)
+                            
+
                         frame_queue.put_nowait(frame_with_detection)
                         print(f"Inserito nella coda un frame con detenzione del modello caricato")
                     else:
                         frame_queue.put_nowait(frame)
                         print("Inserimento nella coda di un frame senza detenzioni")
-                    print(f"Numero di frame all' interno della coda: {frame_queue.qsize}")
                     
                 except queue.Full:
                     print("La coda e' piena")
@@ -123,6 +146,7 @@ def handle_client(client_socket, client_port, model):
             else:
                 print(f"errore nella decodifica dell'immagine da {client_port}")
             
+
 
     except Exception as e:
         print(f"Errore durante la gestione del client {client_port}: {e}")
@@ -157,6 +181,9 @@ def start_server(host, port):
     # creazione finestra con cv2
     window_name = "Frame ricevuto dal client"
     #cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    
+    # creazione dell' oggetto ProximityTracker
+    insect_tracker = ProximityTracker(max_distance=70, max_missing_frames=5)
 
     try:
         while True:
@@ -169,7 +196,7 @@ def start_server(host, port):
 
                 # Avvia un nuovo thread per gestire la connessione del client
                 client_handler = threading.Thread(
-                    target=handle_client, args=(client_socket, client_port, yolo_model)
+                    target=handle_client, args=(client_socket, client_port, yolo_model, insect_tracker)
                 )
                 client_handler.start()
                 client_threads.append(client_handler)
