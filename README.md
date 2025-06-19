@@ -9,5 +9,5 @@ conda env create -f environment_gpu.yml
 
 after the installation you have to activate the environment
 ```bash
-conda activate prog-cpu #or prog-gpu if you installed the other version
+conda activate prog-cpu #or prog if you installed the other version
 ```
