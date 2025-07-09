@@ -1,6 +1,6 @@
 import math
 import time
-
+import copy
 
 class ProximityTracker:
     """
@@ -53,10 +53,13 @@ class ProximityTracker:
             float: La distanza euclidea.
         """
         return math.sqrt((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2)
-
+    
+    def get_total_tracked_objects(self):
+        return copy.deepcopy(self.tracked_objects)
+    
     def update(self, new_detections_bboxes):
         """
-        Aggiorna le tracce degli oggetti con le nuove rilevazioni.
+        Prende in input la lista degli oggetti rilevati e aggiorna le tracce degli oggetti se ci sono state modifiche dalla rilevazione precedente.
 
         Args:
             new_detections_bboxes (list): Una lista di bounding box rilevate nel frame corrente.
@@ -94,7 +97,7 @@ class ProximityTracker:
                     best_match_id = tracked_id
 
             if best_match_id is not None:
-                # Accoppiato! Aggiorna la traccia esistente
+                # Aggiorna la traccia esistente
                 self.tracked_objects[best_match_id]['last_position'] = new_det['centroid']
                 self.tracked_objects[best_match_id]['frames_since_last_seen'] = 0
                 self.tracked_objects[best_match_id]['bbox'] = new_det['bbox']

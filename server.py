@@ -7,9 +7,10 @@ import queue
 import sys
 from ultralytics import YOLO 
 from proximity_tracker import ProximityTracker
+from database_csv import *
 
 # creazione di una coda per gestire la visualizzazione dei frame fuori dal thread client
-frame_queue = queue.Queue(maxsize=100) #maxsize=1 mostra solo il frame piu' recente
+frame_queue = queue.Queue() #maxsize=1 mostra solo il frame piu' recente
 
 # flag per segnalare ai thread di terminare
 stop_threads = False
@@ -93,7 +94,7 @@ def handle_client(client_socket, client_port, model, insect_tracker):
                     break
                 image_data += packet
 
-            client_socket.sendall(b"Immagine ricevuta")
+            client_socket.sendall(b"Immagine ricevuta\n")
             print("Fine ricezione dell'immagine\nInizio decodifica...")
 
 
@@ -112,30 +113,44 @@ def handle_client(client_socket, client_port, model, insect_tracker):
                         results = model.predict(frame, verbose=False)
                         frame_with_detection = frame.copy()
 
-                        # recupero delle coordinate delle bounding boxes e attrubuzione id agli oggetti trovati
-                        objects_detected = results[0].boxes.xyxy.cpu().numpy().astype(int)
+                        # recupero delle coordinate delle bounding boxes
+                        objects_detected_boxes = results[0].boxes.xyxy.cpu().numpy().astype(int)
                         
-                        # per ogni oggetto rilevato recupera la sua bounding box e le altre informazione
-                        # TODO ora che hai gli oggetti tracciati si possono salvare nel database
-                        for i, bbox in enumerate(objects_detected):
-                            xmin, ymin, xmax, ymax = bbox
 
-                        # tracking degli oggetti rivelati
-                        tracket_objects_in_frame = insect_tracker.update(objects_detected)
+                        # tracking degli oggetti rivelati e attribuzione id di tracking
+                        total_tracked_objects = insect_tracker.get_total_tracked_objects()
+                        print(f"total tracked objects:\n{total_tracked_objects}")
+                        tracked_objects_in_frame = insect_tracker.update(objects_detected_boxes)
 
-                        # disegna le informazioni sul frame
-                        for obj in tracket_objects_in_frame:
+                        
+                        # disegna le informazioni sul frame e salva i log su un file csv
+                        for obj in tracked_objects_in_frame:
                             id = obj['id']
                             bbox = obj['bbox']
                             xmin, ymin, xmax, ymax = bbox
+                            centroid = obj['centroid']
+                            if id in total_tracked_objects:
+                                prev_centroid = total_tracked_objects[id]['last_position']
+                            else:
+                                prev_centroid = (0,0)
+                            print(f"centroide: {centroid}, prev centroid: {prev_centroid}")
+                            current_time = time.strftime('%Y-%m-%d_%H:%M:%S', time.localtime(time.time()))
+                           
+                            # stampa il timestamp
+                            cv2.putText(frame_with_detection, current_time, (frame_with_detection.shape[1] - 270, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
                             # disegna bounding box
                             cv2.rectangle(frame_with_detection, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
+                            # disegna il centroide
+                            cv2.circle(frame_with_detection, centroid, 5, (0, 0, 255), -1) 
                             # scrive ID
                             cv2.putText(frame_with_detection, f"ID: {id}", (xmin, ymin - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2, cv2.LINE_AA)
+
+                            # salvataggio del log sul file csv come database
+                            log_insect_data(id, centroid, bbox, current_time)
                             
 
                         frame_queue.put_nowait(frame_with_detection)
-                        print(f"Inserito nella coda un frame con detenzione del modello caricato")
+                        print(f"Inserito nella coda un frame con detenzione del modello caricato\n")
                     else:
                         frame_queue.put_nowait(frame)
                         print("Inserimento nella coda di un frame senza detenzioni")
@@ -180,7 +195,7 @@ def start_server(host, port):
     
     # creazione finestra con cv2
     window_name = "Frame ricevuto dal client"
-    #cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     
     # creazione dell' oggetto ProximityTracker
     insect_tracker = ProximityTracker(max_distance=70, max_missing_frames=5)
@@ -218,10 +233,10 @@ def start_server(host, port):
                 print("Tasto 'q' premuto\nChiusura server...")
                 stop_threads = True
                 break
-            # if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
-            #     print("La finestra e' stata chiusa\nChiusura server...")
-            #     stop_threads = True
-            #     break
+            if cv2.getWindowProperty(window_name, cv2.WND_PROP_VISIBLE) < 1:
+                print("La finestra e' stata chiusa\nChiusura server...")
+                stop_threads = True
+                break
     except KeyboardInterrupt:
         print("Interruzzione da tastiera\nChiusura server...")
         stop_threads = True
@@ -251,7 +266,9 @@ def start_server(host, port):
 if __name__ == "__main__":
 
     #HOST = socket.gethostbyname(socket.gethostname())
-    HOST = "192.168.0.2"
+    #HOST = "192.168.0.2" # host per pc windows fisso
+    HOST = "192.168.0.127" # host per pc portatile linux
+    #HOST = "192.168.214.171" # host per pc portatile linux con hotspot
     PORT = 12345  # Scegli una porta libera
 
     start_server(HOST, PORT)
