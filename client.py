@@ -51,7 +51,7 @@ def send_frame_to_server(host, port):
 
         # Inizializza la variabile per tenere traccia del tempo
         previous_time = time.time()
-        capture_interval = 3  # Cattura un'immagine ogni n secondi
+        capture_interval = 1 # Cattura un'immagine ogni n secondi
 
         while True:
             # Ottieni il tempo corrente
@@ -123,7 +123,10 @@ def send_frame_to_server(host, port):
 
 if __name__ == "__main__":
     # dati del server
-    HOST = "192.168.0.2"  # SOSTITUISCI CON L'INDIRIZZO IP DEL TUO SERVER
+    #HOST = "192.168.0.2"  # ip windows
+    #HOST = "157.27.190.11" # ip linux
+    HOST = "192.168.1.1" # ip linux con hotspot
     PORT = 12345
 
     send_frame_to_server(HOST, PORT)
+
