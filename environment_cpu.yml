@@ -270,8 +270,8 @@ dependencies:
       - networkx==3.2.1
       - pillow==11.0.0
       - sympy==1.13.3
-      - torch==2.7.0+cpu
-      - torchaudio==2.7.0+cpu
-      - torchvision==0.22.0+cpu
+      - torch==2.7.0
+      - torchaudio==2.7.0
+      - torchvision==0.22.0
       - typing-extensions==4.12.2
 prefix: /home/manto/miniconda3/envs/prog-cpu
