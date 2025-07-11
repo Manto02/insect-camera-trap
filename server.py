@@ -16,6 +16,22 @@ frame_queue = queue.Queue() #maxsize=1 mostra solo il frame piu' recente
 stop_threads = False
 
 
+def get_ip():
+    s = None
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80)) # connessione al server DNS di google per trovare ip di rete
+        ip_address = s.getsockname()[0]
+        return ip_address
+    except Exception as e:
+        print(f"Errore nel recupero dell'IP locale: {e}")
+        # Fallback a localhost se non riesce a trovare un IP di rete
+        return "127.0.0.1"
+    finally:
+        if s:
+            s.close()
+
+
 def loadYoloModel(yolo_model):
     try:
         model_path = "./yolo-models/insect_detect2.pt"
@@ -265,10 +281,7 @@ def start_server(host, port):
 
 if __name__ == "__main__":
 
-    #HOST = socket.gethostbyname(socket.gethostname())
-    #HOST = "192.168.0.2" # host per pc windows fisso
-    HOST = "192.168.0.127" # host per pc portatile linux
-    #HOST = "192.168.214.171" # host per pc portatile linux con hotspot
+    HOST = get_ip()
     PORT = 12345  # Scegli una porta libera
 
     start_server(HOST, PORT)
