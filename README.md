@@ -26,7 +26,7 @@ conda activate prog-cpu
 #or if you installed the nvidia version
 conda activate prog
 ```
-2) esegui il server.py ricordando di **inserire il proprio IP alla fine del file server.py**
+2) esegui il server e recupera dal terminale l'ip tramite print del programma (o ifconfig da terminale) per poterlo inserire nel client
 3) esegui il client.py sul raspberry andando a **inserire a fine file l'indirizzo IP del server**
 
 ---
