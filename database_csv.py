@@ -38,7 +38,7 @@ def initialize_csv():
         print(f"Errore nella creazione o apertura del file {CSV_FILE_NAME}: {e}")
 
 
-# prende i dati e li elabora e scrive dentro al file csv
+# prende i dati li elabora e scrive dentro al file csv
 def log_insect_data(insect_id, current_centroid, bbox, time):
     global _last_logged_centroids
     xmin, ymin, xmax, ymax = bbox

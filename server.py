@@ -2,6 +2,7 @@ import socket
 import threading
 import cv2
 import numpy as np
+import time
 import struct
 import queue
 import sys
@@ -14,6 +15,9 @@ frame_queue = queue.Queue() #maxsize=1 mostra solo il frame piu' recente
 
 # flag per segnalare ai thread di terminare
 stop_threads = False
+
+# variabili globali per il framerate
+prev_frame_time = 0
 
 
 def get_ip():
@@ -43,6 +47,22 @@ def loadYoloModel(yolo_model):
         print("Il server continuera' a ricevere le immagini ma non vi applichera' l' inferenza")
         yolo_model = None
         return yolo_model
+
+def framerate():
+    global prev_frame_time
+    new_frame_time = time.time()
+    print(f"new frame time: {new_frame_time}\nprev frame time: {prev_frame_time}")
+    time_diff = new_frame_time - prev_frame_time
+    
+    if time_diff > 0:
+        fps = 1 / time_diff
+        fps_text = f"FPS: {fps:.2f}"
+    else:
+        fps_text = "FPS: N/A"
+    
+    prev_frame_time = new_frame_time
+    
+    return fps_text
 
 def handle_client(client_socket, client_port, model, insect_tracker):
     """Gestisce la comunicazione con un singolo client."""
@@ -119,8 +139,10 @@ def handle_client(client_socket, client_port, model, insect_tracker):
             np_array = np.frombuffer(image_data, dtype=np.uint8)
             # decodifica array numpy in immagine jpeg 
             frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
-
             
+            # calcolo del framerate
+            fps_text = framerate()
+
             # caricamento frame nella coda per la visualizazzione
             if frame is not None:
                 try:
@@ -154,6 +176,8 @@ def handle_client(client_socket, client_port, model, insect_tracker):
                            
                             # stampa il timestamp
                             cv2.putText(frame_with_detection, current_time, (frame_with_detection.shape[1] - 270, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
+                            #stampa il framerate
+                            cv2.putText(frame_with_detection, fps_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA) 
                             # disegna bounding box
                             cv2.rectangle(frame_with_detection, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
                             # disegna il centroide
