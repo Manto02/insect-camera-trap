@@ -8,4 +8,5 @@
 6) se rimane tempo benchmark sulla rete (ethernet/wifi)
 
 # at the moment
-- inizio a lavorare sull' aumentare il framerate tramite threads separati per ogni compito (acquisizione frame, inferenza e display)
+l' aumento del framerate e' andato a buon fine sono riuscito a implementare con successo il thread separato per la ricezione dei frame.
+ora rimane da guardare per inserire la soglia come comando all' avvio e poi iniziare a guardare per studiare l' area degli insetti per la crescita.

@@ -9,7 +9,7 @@ class ProximityTracker:
     """
 
     # costruttore
-    def __init__(self, max_distance=50, max_missing_frames=3):
+    def __init__(self, max_distance=50, max_missing_frames=10):
         """
         Costruttore della classe.
 

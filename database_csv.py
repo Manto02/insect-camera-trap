@@ -70,7 +70,7 @@ def log_insect_data(insect_id, current_centroid, bbox, time):
         except Exception as e:
             print(f"Errore nel logging dei dati: {e}")
     else:
-        print(f"Movimento per {insect_id} inferiore alla soglia {THRESHOLD_MOVEMENT} e quindi non loggata")
+        print(f"Movimento per insetto_id({insect_id}) di {movement_from_last_log}inferiore alla soglia {THRESHOLD_MOVEMENT} e quindi non loggata")
 
 
 
