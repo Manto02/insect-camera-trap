@@ -27,7 +27,15 @@ conda activate prog-cpu
 conda activate prog
 ```
 2) esegui il server e recupera dal terminale l'ip tramite print del programma (o ifconfig da terminale) per poterlo inserire nel client
-3) esegui il client.py sul raspberry andando a **inserire a fine file l'indirizzo IP del server**
+3) avvio server con flag come parametro:
+   - flag -s o --save come parametro all' avvio:
+     - il server al posto di eseguire l' inferenza delle immagini live iniziera' a salvare tutti i frame in una cartella di nome (data_ora_minuti) in un percorso a nostra scelta modificabile a riga 368 del server
+   - flag -l o --live come parametro all' avvio:
+     - il server eseguira' l' inferenza su tutti i frame catturati dal raspberry in tempo reale
+   - flag -t o --threshold
+     - il server prendera il valore inserito dopo la flag come nuovo valore di soglia da superare per inserire nel database un nuovo movimento
+     
+4) esegui il client.py sul raspberry andando a **inserire a fine file l'indirizzo IP del server**
 
 ---
 
