@@ -37,6 +37,10 @@ conda activate prog
      
 4) esegui il client.py sul raspberry andando a **inserire a fine file l'indirizzo IP del server**
 
+
+- ora e' possibile eseguire l' inferenza sul dataset ottenuto tramite il server con la flag -s facendo partire il programma detection.py
+-   per fare in modo che l' inferenza avvenga sul dataset voluto e' necessario andare a modificare il codice a riga 107 inserendo il path della cartella che si vuole analizzare
+
 ---
 
 
