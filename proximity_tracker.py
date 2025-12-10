@@ -110,7 +110,7 @@ class ProximityTracker:
                 matched_new_detection_indices.add(new_idx)
                 matched_tracked_ids.add(best_match_id)
 
-        # Fase 2: Gestisci le nuove rilevazioni non accoppiate (sono nuovi oggetti)
+        # Fase 2: Gestisce le nuove rilevazioni non accoppiate (sono nuovi oggetti)
         for new_idx, new_det in enumerate(new_detections_with_centroids):
             if new_idx not in matched_new_detection_indices:
                 new_id = self.next_id

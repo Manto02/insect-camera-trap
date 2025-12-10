@@ -1,11 +1,9 @@
 import csv
 import os
-import time
 import math
 
 CSV_FILE_NAME = "insect_tracking_log.csv"
 CSV_HEADEARS = ["Insect_ID", "Center_X_Pixel", "Center_Y_Pixel", "Area_Pixel", "Timestamp"]
-THRESHOLD_MOVEMENT = 5.0 # soglia di pixel per il quale e' considerato valido uno spostamento dell'insetto e non un semplice reset della box
 # Dizionario per memorizzare l'ultima posizione loggata per ogni insetto
 _last_logged_centroids = {}
 
@@ -16,9 +14,11 @@ def _calculate_distance_pixels(p1, p2):
     return math.sqrt((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2)
 
 # crea se non esiste il file csv per memorizzare i dati. Se esiste lo apre solamente
-def initialize_csv():
+def initialize_csv(file_name = CSV_FILE_NAME):
     global LAST_X
     global LAST_Y
+    global CSV_FILE_NAME
+    CSV_FILE_NAME = file_name
     try:
         file_exists = False
         if os.path.exists(CSV_FILE_NAME):
@@ -39,7 +39,7 @@ def initialize_csv():
 
 
 # prende i dati li elabora e scrive dentro al file csv
-def log_insect_data(insect_id, current_centroid, bbox, time):
+def log_insect_data(insect_id, current_centroid, bbox, time, THRESHOLD_MOVEMENT):
     global _last_logged_centroids
     xmin, ymin, xmax, ymax = bbox
     
@@ -70,7 +70,7 @@ def log_insect_data(insect_id, current_centroid, bbox, time):
         except Exception as e:
             print(f"Errore nel logging dei dati: {e}")
     else:
-        print(f"Movimento per insetto_id({insect_id}) di {movement_from_last_log}inferiore alla soglia {THRESHOLD_MOVEMENT} e quindi non loggata")
+        print(f"Movimento per insetto_id({insect_id}) di {movement_from_last_log} inferiore alla soglia {THRESHOLD_MOVEMENT} e quindi non loggata")
 
 
 

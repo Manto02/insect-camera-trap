@@ -3,22 +3,29 @@ import threading
 import cv2
 import numpy as np
 import time
+import argparse
 import struct
 import queue
 import sys
 from ultralytics import YOLO 
 from proximity_tracker import ProximityTracker
 from database_csv import *
+from detection import inference_and_tracking
 
 # creazione di una coda per gestire la visualizzazione dei frame fuori dal thread client
-frame_queue = queue.Queue(maxsize=1) #maxsize=1 mostra solo il frame piu' recenteo
-frame_with_detection_queue = queue.Queue(maxsize=1)
+frame_queue = queue.Queue(maxsize=10) #maxsize=1 mostra solo il frame piu' recenteo
+frame_with_detection_queue = queue.Queue(maxsize=10)
+image_queue = queue.Queue(maxsize=50)
 
 # evento thread per segnalare ai thread di terminare
 stop_threads = threading.Event()
 
 # variabili globali per il framerate
 prev_frame_time = 0
+THRESHOLD_MOVEMENT = 5.0 # soglia di pixel per il quale e' considerato valido uno spostamento dell'insetto e non un semplice reset della box
+frames_directory = ""
+save_flag = False
+live_flag = False
 
 
 def get_ip():
@@ -77,7 +84,7 @@ def get_frame(client_socket, client_port):
                     return
                 try:
                     # timeout per evitare blocchi se il client di disconnette bruscamente
-                    client_socket.settimeout(1.0) # timeout 1 secondo    
+                    client_socket.settimeout(0.1)   
                     packet = client_socket.recv(image_size_bytes - len(size_data))  # Riceve fino a 1024 byte
                 except socket.timeout:
                     if stop_threads.is_set():
@@ -112,7 +119,7 @@ def get_frame(client_socket, client_port):
                 if stop_threads.is_set():
                     return
                 try:
-                    client_socket.settimeout(5.0) # imposta timeout per la ricezione dell' immagine
+                    client_socket.settimeout(0.1) # imposta timeout per la ricezione dell' immagine
                     bytes_to_receive = min(image_size - len(image_data), 4096)
                     packet = client_socket.recv(bytes_to_receive)
                 except socket.timeout:
@@ -140,6 +147,16 @@ def get_frame(client_socket, client_port):
             # codifica dei byte ricevuti in immagine jpg
             # conversione bytes in array numpy
             np_array = np.frombuffer(image_data, dtype=np.uint8)
+            if save_flag:
+                try:
+                    image_queue.put_nowait(image_data)
+                except queue.Full:
+                    try:
+                        image_queue.get_nowait()  # rimuovi il frame piu' vecchio
+                        image_queue.put_nowait(image_data)  # inserisci il nuovo frame
+                    except queue.Full:
+                        pass  # se ancora pieno, scarta il nuovo frame
+                
             # decodifica array numpy in immagine jpeg 
             frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
 
@@ -171,6 +188,29 @@ def get_frame(client_socket, client_port):
 
     print("Thread di ricezione frame terminato")
 
+def save_frame(image, timestamp, directory):
+
+    if not directory or os.path.isdir(directory) == False:
+        print("Directory non valida per il salvataggio dei frame")
+        return
+
+    datetime = time.strftime('%Y_%m_%d__%H:%M:%S', time.localtime(timestamp))
+    milliseconds = f"{int((timestamp % 1) * 1000):03d}"
+    filename = f"{datetime}_{milliseconds}.jpg"
+    print(f"directory: {directory}\nfilename: {filename}\nmilliseconds: {milliseconds}\n")
+
+    filepath = os.path.join(directory, filename)
+    print(f"Salvataggio del frame in {filepath}...\n\n\n\n\n\n\n\n")
+
+    try:
+        with open(filepath, 'wb') as f:
+            f.write(image)
+            print(f"Frame salvato in {filepath}")
+    except Exception as e:
+        print(f"Errore nel salvataggio del frame in {filepath}: {e}")
+    
+    return 
+
 
 def handle_client(client_socket, client_port, model, insect_tracker):
     """Gestisce la comunicazione con un singolo client."""
@@ -180,11 +220,14 @@ def handle_client(client_socket, client_port, model, insect_tracker):
     listeners_handler = threading.Thread(target=get_frame, args=(client_socket, client_port))
     listeners_handler.start()
 
+    # thread per salvataggio frame ricevuti
+    #save_handler = threading.Thread(target=save_frame, args=(image_queue, frames_directory))
+    #save_handler.start()
+
     try:
         while not stop_threads.is_set():
             try:
                 # caricamento frame nella coda per la visualizazzione
-                # usiamo un timeout per permettere al loop di controllare periodicamente lo stato di stop_threads
                 frame = frame_queue.get_nowait()
                 print(f"stato frame_queue in handle_client: {frame_queue.qsize()}/{frame_queue.maxsize} frames")
             except queue.Empty:
@@ -193,79 +236,20 @@ def handle_client(client_socket, client_port, model, insect_tracker):
                    break
                continue 
 
+            # salvataggio del frame ricevuto se l' opzione e' attivata
+            if save_flag:
+                timestamp = time.time()
+                image = image_queue.get_nowait()
+                save_frame(image, timestamp, frames_directory)
+
             # calcolo del framerate
             fps_text = framerate()
 
-            if frame is not None:
-                frame_with_detection = frame.copy()
-                try:
-                    # inferenza yolo 
-                    if model is not None:
-                        results = model.predict(frame, verbose=False)
+            # inferenza e tracking
+            if live_flag:
+                timestamp = time.strftime('%Y-%m-%d_%H:%M:%S', time.localtime(time.time())) 
+                frame_with_detection_queue.put_nowait(inference_and_tracking(frame, model, insect_tracker, timestamp, THRESHOLD_MOVEMENT))
 
-                        # recupero delle coordinate delle bounding boxes
-                        objects_detected_boxes = results[0].boxes.xyxy.cpu().numpy().astype(int)
-                        
-
-                        # tracking degli oggetti rivelati e attribuzione id di tracking
-                        total_tracked_objects = insect_tracker.get_total_tracked_objects()
-                        print(f"total tracked objects:\n{total_tracked_objects}")
-                        tracked_objects_in_frame = insect_tracker.update(objects_detected_boxes)
-
-                        
-                        # disegna le informazioni sul frame e salva i log su un file csv
-                        for obj in tracked_objects_in_frame:
-                            id = obj['id']
-                            bbox = obj['bbox']
-                            xmin, ymin, xmax, ymax = bbox
-                            centroid = obj['centroid']
-                            if id in total_tracked_objects:
-                                prev_centroid = total_tracked_objects[id]['last_position']
-                            else:
-                                prev_centroid = (0,0)
-                            print(f"centroide: {centroid}, prev centroid: {prev_centroid}")
-                            current_time = time.strftime('%Y-%m-%d_%H:%M:%S', time.localtime(time.time()))
-                           
-                            # stampa il timestamp
-                            cv2.putText(frame_with_detection, current_time, (frame_with_detection.shape[1] - 270, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-                            #stampa il framerate
-                            cv2.putText(frame_with_detection, fps_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA) 
-                            # disegna bounding box
-                            cv2.rectangle(frame_with_detection, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
-                            # disegna il centroide
-                            cv2.circle(frame_with_detection, centroid, 5, (0, 0, 255), -1) 
-                            # scrive ID
-                            cv2.putText(frame_with_detection, f"ID: {id}", (xmin, ymin - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0,255,0), 2, cv2.LINE_AA)
-
-                            # salvataggio del log sul file csv come database
-                            log_insect_data(id, centroid, bbox, current_time)
-                            
-                        try:
-                            frame_with_detection_queue.put_nowait(frame_with_detection)
-                        except queue.Full:
-                            try:
-                                frame_with_detection_queue.get_nowait()  # rimuovi il frame piu' vecchio
-                                frame_with_detection_queue.put_nowait(frame_with_detection)  # inserisci il nuovo frame
-                            except queue.Full:
-                                pass  # se ancora pieno, scarta il nuovo frame
-                        print(f"Inserito nella coda un frame con inferenza del modello caricato\n")
-                    else:
-                        # Se il modello non è caricato, mostra il frame originale con l'FPS e il timestamp
-                        current_time = time.strftime('%Y-%m-%d_%H:%M:%S', time.localtime(time.time()))
-                        cv2.putText(frame_with_detection, fps_text, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
-                        cv2.putText(frame_with_detection, current_time, (frame_with_detection.shape[1] - 270, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2, cv2.LINE_AA)
-                        try:
-                            frame_with_detection_queue.put_nowait(frame_with_detection)
-                        except queue.Full:
-                            try:
-                                frame_with_detection_queue.get_nowait()
-                                frame_with_detection_queue.put_nowait(frame_with_detection)
-                            except queue.Empty:
-                                pass
-                        print("Modello per inferenza non caricato con successo o inferenza non eseguita, visualizzo il frame originale")
-                    
-                except Exception as e:
-                    print(f"Errore durante l' elaborazione del frame da {client_port}: {e}")
             
     except Exception as e:
         print(f"Errore durante la gestione del client {client_port}: {e}")
@@ -374,6 +358,20 @@ def start_server(host, port):
         print("Server chiuso")
         sys.exit(0)
             
+def create_frames_directory():
+    import os
+    import time
+    
+    timestamp = time.strftime('%Y_%m_%d__%H:%M:%S', time.localtime(time.time()))
+    
+    #frames_directory = os.path.join("datasets", timestamp)
+    frames_directory = os.path.join("/home/manto/Scrivania/datasets_tesi", timestamp)
+    if not os.path.exists(frames_directory):
+        os.makedirs(frames_directory)
+        print(f"Cartella '{frames_directory}' creata per il salvataggio dei frame ricevuti.")
+    else:
+        print(f"Cartella '{frames_directory}' gia' esistente.")
+    return frames_directory
 
 
 if __name__ == "__main__":
@@ -381,5 +379,19 @@ if __name__ == "__main__":
     HOST = get_ip()
     PORT = 12345  # Scegli una porta libera
 
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-t', '--threshold', type=float, default=5.0, help='Soglia di movimento in pixel per loggare i dati nel file csv')
+    parser.add_argument('-s', '--save', action='store_true', help='Salva i frame ricevuti in una cartella locale')
+    parser.add_argument('-l', '--live', action='store_true', help='Esegue inferenza e tracking in tempo reale sui frame ricevuti')
+
+    args = parser.parse_args()
+    save_flag = args.save
+    live_flag = args.live
+    THRESHOLD_MOVEMENT = args.threshold
+    print(f"Soglia di movimento impostata a {THRESHOLD_MOVEMENT} pixel")
+    
     initialize_csv()
+    if save_flag:
+        frames_directory = create_frames_directory()
+
     start_server(HOST, PORT)
