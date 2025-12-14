@@ -6,6 +6,8 @@ from database_csv import *
 import os
 import argparse
 from proximity_tracker import ProximityTracker
+import tkinter as tk
+from tkinter import filedialog
 
 def loadYoloModel(yolo_model):
     try:
@@ -104,13 +106,13 @@ def main(image_directory: str):
 
 if __name__ == "__main__":
 
-    image_directory = "/home/manto/Scrivania/datasets_tesi/2025_12_10__15:57:04"
-
     # parser per argomenti da linea di comando
     parser = argparse.ArgumentParser()
     parser.add_argument('-t', '--threshold', type=float, default=5.0, help='Soglia di movimento in pixel per loggare i dati nel file csv')
+    parser.add_argument('-p', '--path', type=str, default="", help='Directory contenente le immagini da processare')
     args = parser.parse_args()
     THRESHOLD_MOVEMENT = args.threshold
+    image_directory = args.path
 
     # creo o apro il csv per il logging dei dati
     initialize_csv("prova_tracking_differita.csv")
@@ -122,4 +124,13 @@ if __name__ == "__main__":
     insect_tracker = ProximityTracker(max_distance=70, max_missing_frames=10)
 
     print(f"Soglia di movimento impostata a {THRESHOLD_MOVEMENT} pixel")
-    main(image_directory)
+    
+    if image_directory == "":
+        print("Nessuna directory specificata. Scegliere la directory contenente le immagini per procedere.")
+        root = tk.Tk()
+        root.withdraw()  # Nasconde la finestra principale
+        selected_directory = filedialog.askdirectory(title="Seleziona la directory contenente le immagini")
+        print(f"Directory selezionata: {selected_directory}")
+        main(selected_directory)
+    else:
+        main(image_directory)

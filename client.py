@@ -6,6 +6,7 @@ import numpy as np
 import os
 import sys
 import tkinter
+import argparse
 
 
 def get_screen_resolution_tkinter():
@@ -51,7 +52,7 @@ def send_frame_to_server(host, port):
 
         # Inizializza la variabile per tenere traccia del tempo
         previous_time = time.time()
-        capture_interval = 1 # Cattura un'immagine ogni n secondi
+        capture_interval = 0 # Cattura un'immagine ogni n secondi
 
         while True:
             # Ottieni il tempo corrente
@@ -122,11 +123,18 @@ def send_frame_to_server(host, port):
 
 
 if __name__ == "__main__":
+
+    # creazione parser per argomenti da linea di comando
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-ip', type=str, default="",help='Inserire l indirizzo IP del server')
+    args = parser.parse_args()
     # dati del server
-    #HOST = "192.168.0.2"  # ip windows
-    #HOST = "157.27.190.11" # ip linux
-    HOST = "192.168.1.1" # ip linux con hotspot
+    HOST = args.ip # ip linux con hotspot
     PORT = 12345
 
-    send_frame_to_server(HOST, PORT)
+    if HOST == "":
+        print("Errore: Nessun indirizzo IP del server specificato. Usa l'argomento -ip per specificare l'indirizzo.")
+        sys.exit(1)
+    else:
+        send_frame_to_server(HOST, PORT)
 

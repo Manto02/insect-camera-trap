@@ -11,6 +11,8 @@ from ultralytics import YOLO
 from proximity_tracker import ProximityTracker
 from database_csv import *
 from detection import inference_and_tracking
+import tkinter as tk
+from tkinter import filedialog
 
 # creazione di una coda per gestire la visualizzazione dei frame fuori dal thread client
 frame_queue = queue.Queue(maxsize=10) #maxsize=1 mostra solo il frame piu' recenteo
@@ -358,19 +360,20 @@ def start_server(host, port):
         print("Server chiuso")
         sys.exit(0)
             
-def create_frames_directory():
+def create_frames_directory(frames_directory):
     import os
     import time
     
     timestamp = time.strftime('%Y_%m_%d__%H:%M:%S', time.localtime(time.time()))
+
+    frames_directory = os.path.join(frames_directory, timestamp)
+    try:
+        os.makedirs(frames_directory, exist_ok=True)
+    except Exception as e: 
+        print(f"Errore nella creazione della cartella per il salvataggio dei frame: {e}")
+        exit(1)
+    print(f"La cartella per il salvataggio dei frame e': {frames_directory}")
     
-    #frames_directory = os.path.join("datasets", timestamp)
-    frames_directory = os.path.join("/home/manto/Scrivania/datasets_tesi", timestamp)
-    if not os.path.exists(frames_directory):
-        os.makedirs(frames_directory)
-        print(f"Cartella '{frames_directory}' creata per il salvataggio dei frame ricevuti.")
-    else:
-        print(f"Cartella '{frames_directory}' gia' esistente.")
     return frames_directory
 
 
@@ -383,6 +386,7 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--threshold', type=float, default=5.0, help='Soglia di movimento in pixel per loggare i dati nel file csv')
     parser.add_argument('-s', '--save', action='store_true', help='Salva i frame ricevuti in una cartella locale')
     parser.add_argument('-l', '--live', action='store_true', help='Esegue inferenza e tracking in tempo reale sui frame ricevuti')
+    parser.add_argument('-p', '--path', type=str, default='', help='Percorso della cartella dove salvare i frame')
 
     args = parser.parse_args()
     save_flag = args.save
@@ -391,7 +395,25 @@ if __name__ == "__main__":
     print(f"Soglia di movimento impostata a {THRESHOLD_MOVEMENT} pixel")
     
     initialize_csv()
-    if save_flag:
-        frames_directory = create_frames_directory()
-
-    start_server(HOST, PORT)
+    if save_flag: 
+        if args.path != '':
+            print("Server in avvio con modalita' salvataggio frame attivata")
+            frames_directory = create_frames_directory(args.path)
+        else:
+            print("Seleziona la cartella dove salvare i frame ricevuti")
+            root = tk.Tk()
+            root.withdraw()  # Nascondi la finestra principale
+            selected_directory = filedialog.askdirectory(title="Seleziona la cartella dove salvare i frame ricevuti")
+            if selected_directory:
+                frames_directory = create_frames_directory(selected_directory)
+            else:
+                print("Nessuna cartella selezionata. Per avviare il server in modalita' salvataggio frame e' necessario selezionare una cartella.")
+                exit(1)
+            start_server(HOST, PORT)
+    elif live_flag == True and save_flag == False:
+        print("Server in avvio con modalita' inferenza e tracking in tempo reale attivata")
+        start_server(HOST, PORT)
+    else:
+        print("Specificare almeno una modalita' tra salvataggio frame (-s) o inferenza e tracking in tempo reale (-l) per avviare il server")
+        exit(1)
+    

@@ -1,11 +1,10 @@
 import socket
 import cv2
 import time
-from picamera2 import Picamera2
 import numpy as np
-import os
 import sys
-import tkinter
+import argparse
+from detection import get_ordered_image_files
 
 
 def send_frame_to_server(host, port):
@@ -24,9 +23,13 @@ def send_frame_to_server(host, port):
     try:
         client_socket.connect((host, port))
         print(f"connesso al server {host}:{port}")
-        percorso_immagine = "./immagini_rilevate/prova.jpg"
+        percorso_immagine = "/home/manto/Scrivania/datasets_tesi/2025_12_10__17:35:17"
+        image_paths = get_ordered_image_files(percorso_immagine)
+        print(f"Trovate {len(image_paths)} immagini nella directory {percorso_immagine}")
+        i=1
 
-        while True:
+        for percorso_immagine in image_paths:
+            print(f"Invio dell'immagine numero {i}")
 
             frame = cv2.imread(percorso_immagine)
             ret, encoded_image = cv2.imencode(".jpg", frame)
@@ -57,6 +60,8 @@ def send_frame_to_server(host, port):
                 print(f"Errore durante l'invio/ricezione dei dati: {e}")
                 break  # Esci dal loop in caso di errore di socket
             # --- Fine logica invio frame ---
+            i+=1
+            time.sleep(0.5)  # Pausa di mezzo secondo tra l'invio delle immagini
 
     except ConnectionRefusedError:
         print(
@@ -72,8 +77,16 @@ def send_frame_to_server(host, port):
 
 
 if __name__ == "__main__":
+    # creazione parser per argomenti da linea di comando
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-ip', type=str, default="",help='Indirizzo IP del server')
+    args = parser.parse_args()
     # dati del server
-    HOST = "192.168.0.2"  # SOSTITUISCI CON L'INDIRIZZO IP DEL TUO SERVER
+    HOST = args.ip # ip linux con hotspot
     PORT = 12345
 
-    send_frame_to_server(HOST, PORT)
+    if HOST == "":
+        print("Errore: Nessun indirizzo IP del server specificato. Usa l'argomento -ip per specificare l'indirizzo.")
+        sys.exit(1)
+    else:
+        send_frame_to_server(HOST, PORT)
