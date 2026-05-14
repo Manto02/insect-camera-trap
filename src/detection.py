@@ -11,7 +11,7 @@ from tkinter import filedialog
 
 def loadYoloModel(yolo_model):
     try:
-        model_path = "./yolo-models/insect_detect2.pt"
+        model_path = "../yolo-models/insect_detect2.pt"
         yolo_model = YOLO(model_path, task = 'detect')
         print("Modello yolo caricato con successo")
         return yolo_model
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     image_directory = args.path
 
     # creo o apro il csv per il logging dei dati
-    initialize_csv("prova_tracking_differita.csv")
+    initialize_csv("../data/prova_tracking_differita.csv")
 
     # carico il modello yolo
     model = loadYoloModel(None)

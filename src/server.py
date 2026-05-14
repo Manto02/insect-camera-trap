@@ -48,7 +48,7 @@ def get_ip():
 
 def loadYoloModel(yolo_model):
     try:
-        model_path = "./yolo-models/insect_detect2.pt"
+        model_path = "../yolo-models/insect_detect2.pt"
         yolo_model = YOLO(model_path, task = 'detect')
         print("Modello yolo caricato con successo")
         return yolo_model

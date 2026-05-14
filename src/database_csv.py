@@ -2,7 +2,7 @@ import csv
 import os
 import math
 
-CSV_FILE_NAME = "insect_tracking_log.csv"
+CSV_FILE_NAME = "../data/insect_tracking_log.csv"
 CSV_HEADEARS = ["Insect_ID", "Center_X_Pixel", "Center_Y_Pixel", "Area_Pixel", "Timestamp"]
 # Dizionario per memorizzare l'ultima posizione loggata per ogni insetto
 _last_logged_centroids = {}
