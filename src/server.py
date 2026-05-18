@@ -364,7 +364,7 @@ def create_frames_directory(frames_directory):
     import os
     import time
     
-    timestamp = time.strftime('%Y_%m_%d__%H:%M:%S', time.localtime(time.time()))
+    timestamp = time.strftime('%Y_%m_%d__%H_%M_%S', time.localtime(time.time()))
 
     frames_directory = os.path.join(frames_directory, timestamp)
     try:
