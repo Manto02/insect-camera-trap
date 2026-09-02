@@ -25,21 +25,65 @@ Il ruolo del client e' svolto da un raspberry pi 3b che tramite la sua fotocamer
 Il ruolo del server viene invece ricoperto da un computer piu' potente per permettere di analizzare le immagini ricevute dal client in live oppure in differita. Il server si occupa di aprire la connessione col client e a seconda della sua modalità di avvio procede a salvarsi le immagini in una cartella scelta dall'utente o eseguire direttamente il tracking live degli insetti tramite un modello YOLO che esegue l'inferenza sulle immagini ricevute tramite la rete.
 
 # 2. Setup ed installazione ambiente
-## requisiti di sistema
-### hardware
+## Requisiti di sistema
+### Hardware
 Client:
 - raspberry pi3 o superiore
 
 Server:
 - computer con linux
-
-### software
-L'intero progetto si basa su programmi scritti in python. Per facilitare lo sviluppo e le dipendenze il sistema usa come ambiente virtuale di sviluppo Anaconda.
-
-- python 3.9.18 -> https://docs.python.org/release/3.9.18/
-- miniconda -> guida all'installazione https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html
   
-## installazione dipendenze
+## Installazione ambiente e sistema operativo raspberry (CLIENT)
+### Installazione sistema operativo su raspberry
+Partendo da un raspberry senza nessuna configurazione occorre per prima cosa installare il sistema operativo su una scheda SD. Per installare il sistema operativo ci affidiamo al software creato direttamente da raspberry, il raspberry pi imager: https://www.raspberrypi.com/software/.
+
+Una volta installato il software, ci basterà semplicemente inserire la nostra scheda sd all'interno del computer ed eseguire i passaggi guidati all'interno dell'imager.
+
+
+### Installazione e controllo dipendenze progetto
+Una volta che il sistema operativo sarà presente nella scheda SD basterà inserirla all'interno della nostra scheda raspberry ed avviarla. 
+Alla prima accesione del raspberry la scheda farà partire la configurazione per il sistema operativo caricato sulla scheda SD con i vari passaggi di creazione account, configurazione di rete ect...
+
+Ora che il raspberry ha il sistema operativo dobbiamo verificare che abbia tutte le dipendenze necessarie per il progetto.
+
+Dipendenze necessarie al raspberry:
+- python -> viene **installato automaticamente** nei sistemi operativi recenti. qualora non dovesse essere presente occorre installarlo
+- picamera2 -> libreria di raspberry per gestire le videocamere attaccate alla scheda. Viene **installata automaticamente** nei sistemi operativi con interfaccia grafica. Qualora non dovesse essere presente nel sistema occorre installarla
+  -   test per vericare che la videocamera attaccata alla scheda funzioni correttamente, utile per visualizzare il campo visivo della videocamera durante l'installazione del setup:
+        ```bash
+        rpicam-hello -t 999999
+        ```
+  
+- opencv -> libreria di computer vision usata per l'elaborazione delle immagini. **Bisogna installarla** col seguente comando perchè non presente di default nel sistema operativo:
+    ```bash
+    sudo apt install python3-opencv
+    ```
+
+### Recupero script client.py su raspberry
+Per eseguire il progetto occorre recuperare ed eseguire lo script client.py sulla nostra scheda raspberry pi.
+
+Metodi per recuperare lo script:
+1) **METODO PIÙ RAPIDO** copiare lo script client.py dal github del progetto: https://github.com/Manto02/insect-camera-trap e incollarlo in un file .py creato tramite editor di testo direttamente sul raspberry
+2) spostare il file da un computer tramite chiavetta usb
+3) clonare la repository del progetto. Questo metodo richiede l'installazione di git sulla scheda raspberry e inoltre andremo a scaricare anche altri file non necessari sul raspberry.
+    ```bash
+    git clone https://github.com/Manto02/insect-camera-trap.git
+    ```
+
+## Installazione dipendenze progetto (SERVER)
+L'intero progetto si basa su programmi scritti in python. Per facilitare lo sviluppo e le dipendenze il sistema usa come ambiente virtuale di sviluppo Anaconda. Le seguenti dipendenze sono neccessarie da installare per far funzionare il server:
+
+- python 3.9.18 -> https://docs.python.org/release/3.9.18/ 
+- miniconda -> guida all'installazione https://docs.conda.io/projects/conda/en/latest/user-guide/install/linux.html
+- git -> sarà necessario installarlo per recuperare il progetto da github e facilitare il processo di sviluppo e manutenzione.
+
+### Recupero del progetto da github
+Per recuperare tutti i file necessari al progetto sarà necessario utilizzare git per clonare la repository del progetto
+```bash
+git clone https://github.com/Manto02/insect-camera-trap.git
+```
+
+### Installazione dipendenze
 Con l'ausilio dell'ambiente virtuale di conda è possibile installare direttamente tutte le dipendenze e librerie richieste per il funzionamento usando il file di configurazione .yml a seconda dell'architettura video del server.
 - environment_cpu.yml -> **file consigliato per uso generico** 
 - environment_gpu.yml -> file da utilizzare solo se si è in possesso di un computer con scheda grafica nvidia e driver installati in linux
@@ -53,7 +97,8 @@ conda env create -f environment_gpu.yml
 
 # 3. Guida all'avvio ed utilizzo
 Una volta installato l'ambiente virtuale con tutte le sue dipendenze il progetto è pronto all'utilizzo.
-## guida step by step per l'avvio
+## Guida step by step per l'avvio
+### Passaggi SERVER
 1. avviare l'ambiente virtuale di conda
 ```bash
 conda activate prog-cpu
@@ -90,12 +135,13 @@ python3 server.py -t  <your value> -s
 # or
 python3 server.py -t  <your value> -s
 ```
+### Passaggi CLIENT
 4. avvia il raspberry ed esegui il file client.py
 ```bash
 python3 client.py -ip  <ip del server>
 ```
 
-## inferenza su un dataset
+## Inferenza su un dataset
 Se abbiamo eseguito il server con la flag -s per salvare i frame ricevuti dal client, ora abbiamo a disposizione una cartella con un dataset da analizzare.
 
 Per eseguire l'inferenza su un dataset usare il file detection.py
@@ -169,7 +215,7 @@ Il modello di computer vision utilizzato per il tracking è YOLOv5, https://docs
 
 Per ottenere delle prestazioni migliori nel riconoscimento si può usare una versione più aggiornata di YOLO
 
-## addestramento
+## Addestramento
 Per il processo di addestramento ci sono 2 fasi principali.
 
 È consigliato aiutarsi nel processo di addestramento con questo video tutorial che presenta tutte le fasi nel dettaglio con esempi.
@@ -194,7 +240,7 @@ Il progetto è funzionante, ma non è stato testato sugli insetti in movimento, 
 
 L'obbiettivo, quindi, è di testare il sistema in un ambiente di lavoro effettivo, in modo da poter costruire dei dataset con la modalità save del server e poter riallenare il modello coi dati raccolti e sistemare la soglia di movimento.
 
-## limitazioni
+## Limitazioni
 - Il sistema TCP attuale non prevede una gestione robusta delle riconnessioni automatiche. In caso di caduta della rete, è necessario riavviare manualmente sia il server che il client
 
 ## TODO
